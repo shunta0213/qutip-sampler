@@ -1,6 +1,6 @@
 [project]
 name = "qutip-sampler"
-version = "0.1.3"
+version = "0.1.4"
 description = "Quantum annealing sampler using QuTiP sesolve"
 readme = "README.md"
 requires-python = ">=3.13"
@@ -50,7 +50,7 @@ build-backend = "hatchling.build"
 packages = ["src/qutip_sampler"]
 
 [tool.bumpversion]
-current_version = "0.1.3"
+current_version = "0.1.4"
 commit = true
 tag = true
 
