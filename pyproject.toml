@@ -27,7 +27,7 @@ classifiers = [
 ]
 dependencies = [
     "dimod>=0.12.21",
-    "numpy>=2.4.3",
+    "numpy>=1.22",
     "qutip>=5.2.3",
 ]
 
