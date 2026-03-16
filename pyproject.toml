@@ -38,6 +38,7 @@ dependencies = [
 [dependency-groups]
 dev = [
     "bump-my-version>=1.2.7",
+    "dwave-ocean-sdk>=9.3.0",
     "pytest>=9.0.2",
     "pytest-cov>=6.0",
 ]

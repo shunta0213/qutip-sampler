@@ -5,6 +5,8 @@ import numpy as np
 import pytest
 import dimod
 
+from dwave.preprocessing.composites import ScaleComposite, SpinReversalTransformComposite
+
 from qutip_sampler import QuTipSampler
 from qutip_sampler.samplers import (
     _build_ising_hamiltonian,
@@ -305,6 +307,167 @@ class TestSampleBqm:
         result = self.sampler.sample(bqm, num_reads=10, seed=0)
         for sample, energy in result.data(['sample', 'energy']):
             assert abs(energy - bqm.energy(sample)) < 1e-8
+
+
+# ---------------------------------------------------------------------------
+# Tests: dimod composites
+# ---------------------------------------------------------------------------
+
+
+class TestDimodComposites:
+    """Verify QuTipSampler composes correctly with dimod's built-in composites."""
+
+    def test_tracking_composite_records_inputs(self):
+        """TrackingComposite should capture the h/J passed to the sampler."""
+        sampler = dimod.TrackingComposite(QuTipSampler())
+        h = {'a': -1.0, 'b': 0.5}
+        J = {('a', 'b'): -0.5}
+        sampler.sample_ising(h, J, num_reads=5, seed=0)
+        assert sampler.input['h'] == h
+        assert sampler.input['J'] == J
+
+    def test_tracking_composite_returns_sampleset(self):
+        sampler = dimod.TrackingComposite(QuTipSampler())
+        result = sampler.sample_ising({'a': -1.0}, {}, num_reads=5, seed=0)
+        assert isinstance(result, dimod.SampleSet)
+
+    def test_tracking_composite_with_bqm(self):
+        sampler = dimod.TrackingComposite(QuTipSampler())
+        bqm = dimod.BinaryQuadraticModel({'a': -1.0, 'b': 0.5}, {('a', 'b'): -0.5}, 0.0, 'SPIN')
+        result = sampler.sample(bqm, num_reads=5, seed=0)
+        assert isinstance(result, dimod.SampleSet)
+        assert result.vartype == dimod.SPIN
+
+    def test_tracking_composite_with_qubo(self):
+        sampler = dimod.TrackingComposite(QuTipSampler())
+        Q = {('a', 'a'): -1.0, ('b', 'b'): -1.0, ('a', 'b'): 0.5}
+        result = sampler.sample_qubo(Q, num_reads=5, seed=0)
+        assert isinstance(result, dimod.SampleSet)
+        assert result.vartype == dimod.BINARY
+
+    def test_truncate_composite_limits_samples(self):
+        """TruncateComposite(n=3) should return exactly 3 lowest-energy samples."""
+        sampler = dimod.TruncateComposite(QuTipSampler(), n=3)
+        result = sampler.sample_ising({'a': -1.0, 'b': 1.0}, {('a', 'b'): -0.5}, num_reads=20, seed=0)
+        assert len(result) == 3
+
+    def test_truncate_composite_returns_lowest_energy(self):
+        """Samples from TruncateComposite must be sorted by energy ascending."""
+        sampler = dimod.TruncateComposite(QuTipSampler(), n=5)
+        result = sampler.sample_ising({'a': -1.0, 'b': 1.0}, {('a', 'b'): -0.5}, num_reads=30, seed=0)
+        energies = [e for _, e in result.data(['sample', 'energy'])]
+        assert energies == sorted(energies)
+
+    def test_truncate_composite_with_bqm(self):
+        sampler = dimod.TruncateComposite(QuTipSampler(), n=4)
+        bqm = dimod.BinaryQuadraticModel({'a': -1.0, 'b': 0.5}, {('a', 'b'): -0.5}, 0.0, 'SPIN')
+        result = sampler.sample(bqm, num_reads=20, seed=0)
+        assert len(result) == 4
+        assert result.vartype == dimod.SPIN
+
+    def test_nested_composites(self):
+        """TrackingComposite wrapping TruncateComposite wrapping QuTipSampler."""
+        inner = dimod.TruncateComposite(QuTipSampler(), n=3)
+        sampler = dimod.TrackingComposite(inner)
+        result = sampler.sample_ising({'a': -1.0}, {}, num_reads=10, seed=0)
+        assert isinstance(result, dimod.SampleSet)
+        assert len(result) == 3
+
+
+# ---------------------------------------------------------------------------
+# Tests: dwave-preprocessing composites
+# ---------------------------------------------------------------------------
+
+
+class TestDwavePreprocessingComposites:
+    """Verify QuTipSampler composes with dwave-preprocessing composites."""
+
+    # --- SpinReversalTransformComposite ---
+
+    def test_srtc_returns_sampleset(self):
+        sampler = SpinReversalTransformComposite(QuTipSampler())
+        result = sampler.sample_ising({'a': -1.0}, {}, num_reads=5, seed=0)
+        assert isinstance(result, dimod.SampleSet)
+
+    def test_srtc_vartype_is_spin(self):
+        sampler = SpinReversalTransformComposite(QuTipSampler())
+        result = sampler.sample_ising({'a': -1.0, 'b': 1.0}, {('a', 'b'): -0.5}, num_reads=5, seed=0)
+        assert result.vartype == dimod.SPIN
+
+    def test_srtc_spin_values_valid(self):
+        sampler = SpinReversalTransformComposite(QuTipSampler())
+        result = sampler.sample_ising({'a': -1.0, 'b': 1.0}, {('a', 'b'): -0.5}, num_reads=20, seed=0)
+        for sample in result.samples():
+            for val in sample.values():
+                assert val in (-1, +1)
+
+    def test_srtc_with_bqm_spin(self):
+        sampler = SpinReversalTransformComposite(QuTipSampler())
+        bqm = dimod.BinaryQuadraticModel({'a': -1.0, 'b': 0.5}, {('a', 'b'): -0.5}, 0.0, 'SPIN')
+        result = sampler.sample(bqm, num_reads=5, seed=0)
+        assert result.vartype == dimod.SPIN
+
+    def test_srtc_with_qubo(self):
+        sampler = SpinReversalTransformComposite(QuTipSampler())
+        Q = {('a', 'a'): -1.0, ('b', 'b'): -1.0, ('a', 'b'): 0.5}
+        result = sampler.sample_qubo(Q, num_reads=5, seed=0)
+        assert result.vartype == dimod.BINARY
+
+    def test_srtc_num_transforms_multiplies_reads(self):
+        """num_spin_reversal_transforms=k runs k independent transforms, each
+        with num_reads samples, so the total should be k * num_reads."""
+        sampler = SpinReversalTransformComposite(QuTipSampler())
+        result = sampler.sample_ising(
+            {'a': -1.0}, {}, num_reads=5, seed=0, num_spin_reversal_transforms=3
+        )
+        assert len(result) == 15
+
+    def test_srtc_energy_consistent(self):
+        h = {'a': -1.0, 'b': 0.5}
+        J = {('a', 'b'): -0.5}
+        sampler = SpinReversalTransformComposite(QuTipSampler())
+        result = sampler.sample_ising(h, J, num_reads=10, seed=0)
+        for sample, energy in result.data(['sample', 'energy']):
+            assert abs(energy - dimod.ising_energy(sample, h, J)) < 1e-8
+
+    # --- ScaleComposite ---
+
+    def test_scale_returns_sampleset(self):
+        sampler = ScaleComposite(QuTipSampler())
+        result = sampler.sample_ising({'a': -1.0}, {}, num_reads=5, seed=0, scalar=0.5)
+        assert isinstance(result, dimod.SampleSet)
+
+    def test_scale_vartype_is_spin(self):
+        sampler = ScaleComposite(QuTipSampler())
+        result = sampler.sample_ising({'a': -1.0}, {}, num_reads=5, seed=0, scalar=0.5)
+        assert result.vartype == dimod.SPIN
+
+    def test_scale_energy_consistent(self):
+        """Energies in the result must match the original (unscaled) problem."""
+        h = {'a': -1.0, 'b': 0.5}
+        J = {('a', 'b'): -0.5}
+        sampler = ScaleComposite(QuTipSampler())
+        result = sampler.sample_ising(h, J, num_reads=10, seed=0, scalar=0.5)
+        for sample, energy in result.data(['sample', 'energy']):
+            assert abs(energy - dimod.ising_energy(sample, h, J)) < 1e-8
+
+    def test_scale_with_bqm(self):
+        sampler = ScaleComposite(QuTipSampler())
+        bqm = dimod.BinaryQuadraticModel({'a': -1.0, 'b': 0.5}, {('a', 'b'): -0.5}, 0.0, 'SPIN')
+        result = sampler.sample(bqm, num_reads=5, seed=0, scalar=0.5)
+        assert result.vartype == dimod.SPIN
+
+    # --- Composed together ---
+
+    def test_srtc_wrapping_scale(self):
+        """SpinReversalTransformComposite(ScaleComposite(QuTipSampler()))."""
+        sampler = SpinReversalTransformComposite(ScaleComposite(QuTipSampler()))
+        result = sampler.sample_ising(
+            {'a': -1.0, 'b': 1.0}, {('a', 'b'): -0.5},
+            num_reads=5, seed=0, scalar=0.5,
+        )
+        assert isinstance(result, dimod.SampleSet)
+        assert result.vartype == dimod.SPIN
 
 
 # ---------------------------------------------------------------------------
