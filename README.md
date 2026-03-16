@@ -1,5 +1,11 @@
 # qutip-sampler
 
+[![Tests](https://github.com/shunta0213/qutip-sampler/actions/workflows/test.yml/badge.svg)](https://github.com/shunta0213/qutip-sampler/actions/workflows/test.yml)
+[![codecov](https://codecov.io/gh/shunta0213/qutip-sampler/graph/badge.svg?token=U0SP82EUFP)](https://codecov.io/gh/shunta0213/qutip-sampler)
+[![PyPI](https://img.shields.io/pypi/v/qutip-sampler)](https://pypi.org/project/qutip-sampler/)
+[![Python](https://img.shields.io/pypi/pyversions/qutip-sampler)](https://pypi.org/project/qutip-sampler/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 A [dimod](https://github.com/dwavesystems/dimod)-compatible quantum annealing sampler backed by [QuTiP](https://qutip.org/) `sesolve`.
 
 It maps an Ising / QUBO problem onto a transverse-field Ising Hamiltonian, evolves the ground state via a linear annealing schedule, and draws bitstring samples from the final quantum state.
@@ -32,12 +38,12 @@ print(result.first.sample)   # e.g. {'x': 1, 'y': 1}
 
 ## Parameters
 
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| `anneal_time` | `10.0` | Total annealing time *T* passed to `sesolve` |
-| `n_steps` | `200` | Number of time steps in the annealing schedule |
-| `num_reads` | `100` | Number of bitstring samples drawn from the final state |
-| `seed` | `None` | RNG seed for reproducible sampling |
+| Parameter     | Default | Description                                            |
+| ------------- | ------- | ------------------------------------------------------ |
+| `anneal_time` | `10.0`  | Total annealing time _T_ passed to `sesolve`           |
+| `n_steps`     | `200`   | Number of time steps in the annealing schedule         |
+| `num_reads`   | `100`   | Number of bitstring samples drawn from the final state |
+| `seed`        | `None`  | RNG seed for reproducible sampling                     |
 
 `anneal_time` and `n_steps` can be set at construction time or overridden per call.
 
