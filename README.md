@@ -55,6 +55,22 @@ print(result.first.sample)   # e.g. {'x': 1, 'y': 1}
 4. Evolve `H(t) = (1 − t/T) H_T + (t/T) H_ising` from `t=0` to `t=T` using QuTiP `sesolve`.
 5. Sample bitstrings from the probability distribution `|ψ(T)|²`.
 
+## Release flow
+
+Releases are fully automated via GitHub Actions:
+
+1. **Every push / PR** — the [Tests](.github/workflows/test.yml) workflow runs the test suite and uploads coverage to Codecov.
+2. **On a version tag** — the [Publish](.github/workflows/publish.yml) workflow runs tests first, then builds and publishes to PyPI if they pass.
+
+To cut a release:
+
+```bash
+uvx bump-my-version bump patch   # or minor / major
+git push && git push --tags
+```
+
+`bump-my-version` updates the version in `pyproject.toml`, commits, and creates the tag. Pushing the tag triggers the publish workflow.
+
 ## License
 
 MIT
