@@ -37,6 +37,7 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "bump-my-version>=1.2.7",
     "pytest>=9.0.2",
     "pytest-cov>=6.0",
 ]
@@ -47,3 +48,13 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/qutip_sampler"]
+
+[tool.bumpversion]
+current_version = "0.1.0"
+commit = true
+tag = true
+
+[[tool.bumpversion.files]]
+filename = "pyproject.toml"
+search = 'version = "{current_version}"'
+replace = 'version = "{new_version}"'
