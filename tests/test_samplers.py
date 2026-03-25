@@ -8,7 +8,10 @@ import dimod
 from dwave.preprocessing.composites import ScaleComposite, SpinReversalTransformComposite
 
 from qutip_sampler import QuTipSampler
+from scipy.stats import chisquare
+
 from qutip_sampler.samplers import (
+    _anneal,
     _build_ising_hamiltonian,
     _build_transverse_hamiltonian,
     _initial_state,
@@ -473,6 +476,73 @@ class TestDwavePreprocessingComposites:
 # ---------------------------------------------------------------------------
 # Statistical sanity tests
 # ---------------------------------------------------------------------------
+
+class TestSamplingDistribution:
+    """Check that empirical sample frequencies match |ψ(T)|² from the wave function."""
+
+    def _theoretical_probs(self, h, J, variables, anneal_time=10.0, n_steps=200):
+        """Return the exact |ψ(T)|² probability vector (indexed 0..2^n-1)."""
+        final_state = _anneal(h, J, variables, anneal_time, n_steps)
+        amplitudes = final_state.full().flatten()
+        probs = np.abs(amplitudes) ** 2
+        return probs / probs.sum()
+
+    def _empirical_counts(self, result, variables):
+        """Convert a SampleSet into a count array indexed by basis state."""
+        n = len(variables)
+        var_to_idx = {v: i for i, v in enumerate(variables)}
+        counts = np.zeros(2 ** n)
+        for sample in result.samples():
+            bits = "".join("0" if sample[v] == +1 else "1" for v in variables)
+            counts[int(bits, 2)] += 1
+        return counts
+
+    def test_single_qubit_distribution(self):
+        """1-qubit: empirical frequencies must match |ψ(T)|² (chi-squared, p>0.01)."""
+        h, J = {'a': -1.0}, {}
+        variables = ['a']
+        num_reads = 2000
+
+        result = QuTipSampler().sample_ising(h, J, num_reads=num_reads, seed=0)
+
+        theoretical = self._theoretical_probs(h, J, variables)
+        expected = theoretical * num_reads
+        observed = self._empirical_counts(result, variables)
+
+        _, p_value = chisquare(observed, f_exp=expected)
+        assert p_value > 0.01, f"chi-squared p={p_value:.4f}: sample distribution deviates from |ψ(T)|²"
+
+    def test_two_qubit_distribution(self):
+        """2-qubit: empirical frequencies over all 4 basis states match |ψ(T)|²."""
+        h, J = {'a': -1.0, 'b': 0.5}, {('a', 'b'): -0.5}
+        variables = ['a', 'b']
+        num_reads = 4000
+
+        result = QuTipSampler().sample_ising(h, J, num_reads=num_reads, seed=0)
+
+        theoretical = self._theoretical_probs(h, J, variables)
+        expected = theoretical * num_reads
+        observed = self._empirical_counts(result, variables)
+
+        _, p_value = chisquare(observed, f_exp=expected)
+        assert p_value > 0.01, f"chi-squared p={p_value:.4f}: sample distribution deviates from |ψ(T)|²"
+
+    def test_three_qubit_distribution(self):
+        """3-qubit: empirical frequencies over all 8 basis states match |ψ(T)|²."""
+        h = {'a': -1.0, 'b': 0.5, 'c': -0.5}
+        J = {('a', 'b'): -0.5, ('b', 'c'): 0.25}
+        variables = ['a', 'b', 'c']
+        num_reads = 8000
+
+        result = QuTipSampler().sample_ising(h, J, num_reads=num_reads, seed=0)
+
+        theoretical = self._theoretical_probs(h, J, variables)
+        expected = theoretical * num_reads
+        observed = self._empirical_counts(result, variables)
+
+        _, p_value = chisquare(observed, f_exp=expected)
+        assert p_value > 0.01, f"chi-squared p={p_value:.4f}: sample distribution deviates from |ψ(T)|²"
+
 
 class TestStatisticalSanity:
     @pytest.mark.slow
