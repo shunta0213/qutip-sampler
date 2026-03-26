@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:docs.dwavequantum.com)",
+      "WebSearch",
+      "Bash(uv run python -c \":*)",
+      "Bash(uv run:*)"
+    ]
+  }
+}
